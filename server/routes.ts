@@ -30,6 +30,7 @@ const upload = multer({
 // WhatsApp connection state
 let sock: any = null;
 let qrCodeDisplayed = false;
+let currentQrCode: string | null = null;
 
 // Initialize WhatsApp connection
 async function initializeWhatsApp() {
@@ -44,9 +45,10 @@ async function initializeWhatsApp() {
     sock.ev.on('connection.update', (update: any) => {
       const { connection, lastDisconnect, qr } = update;
       
-      if (qr && !qrCodeDisplayed) {
+      if (qr) {
         console.log('\n🔗 WhatsApp QR Code:');
         qrcode.generate(qr, { small: true });
+        currentQrCode = qr;
         qrCodeDisplayed = true;
       }
       
@@ -61,6 +63,7 @@ async function initializeWhatsApp() {
       } else if (connection === 'open') {
         console.log('✅ WhatsApp connected successfully');
         qrCodeDisplayed = false;
+        currentQrCode = null;
       }
     });
 
@@ -239,7 +242,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({
       connected: !!isConnected,
       phoneNumber: isConnected ? sock.user.id : null,
-      qrRequired: !isConnected && !qrCodeDisplayed
+      qrRequired: !isConnected && !qrCodeDisplayed,
+      qrCode: currentQrCode
     });
   });
 
