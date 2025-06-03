@@ -7,7 +7,8 @@ import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 
 // Baileys imports
-import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys';
+import * as baileys from '@whiskeysockets/baileys';
+const { makeWASocket, DisconnectReason, useMultiFileAuthState } = baileys;
 import { Boom } from '@hapi/boom';
 import qrcode from 'qrcode-terminal';
 
