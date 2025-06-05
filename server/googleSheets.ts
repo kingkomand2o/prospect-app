@@ -14,7 +14,7 @@ export async function fetchProspectsFromSheet() {
     const client = await auth.getClient();
     const sheets = google.sheets({ version: 'v4', auth: client });
 
-    const spreadsheetId = '1yPxhCe6AaP19TxtwD-KE0tdjrL8TsbbClq0FkzbIT0w';
+    const spreadsheetId = '1b9Syf_zDlm5a_YrRl3h3QU9kOb6Fo0UN7BWfNjBcic0';
     const range = 'Sheet1!A1:Z'; // Get enough columns including headers
 
     console.log('📊 Calling Google Sheets API...');
@@ -128,7 +128,7 @@ export async function testGoogleSheetsConnection() {
     const sheets = google.sheets({ version: 'v4', auth: client as any });
 
     // Test by getting the spreadsheet metadata
-    const spreadsheetId = '1yPxhCe6AaP19TxtwD-KE0tdjrL8TsbbClq0FkzbIT0w';
+    const spreadsheetId = '1b9Syf_zDlm5a_YrRl3h3QU9kOb6Fo0UN7BWfNjBcic0';
     const response = await sheets.spreadsheets.get({
       spreadsheetId,
     });
