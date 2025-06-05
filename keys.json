@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "salonautomation",
+  "private_key_id": "dba1d440ad60e076dd1fc80865b01d34a3c1bd00",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCBOVa2AcEkGOb7\nHqFl/SUUh7csztvoiwZsfyMeRtzOqhpMut2Ivh4sUHh1TNLD2gdWg/r0NwCgVGAM\n+mztd3ofXdCQu58g01VmSWfkg4r6UIuX4KvyfRwutLD2VZzMgN0KJOV3/xQglhv3\ngD9HilXFuuKDS8Seo6pVY4bXxzhAfl4Ffz0VtNIrY9qEaBDhkusnRD5BrP2HBmTa\n5/Hv7eMgW8Zl7bJmZxNsYAf4PkYI4pZv2iwHV1Z/eM+EDGoYmeQfTWbPwSYbxg5Z\nGBOQMJbgFQvw32YP2Kfo/cdIOT9kko+oTj0rcICZjGmgU8PNbXJPclGSykEjIcUd\nvLPSfzSHAgMBAAECggEADKkmgryXRMcf0ljE7W4o9OL7Imu+BgGhBn5KXYwJ1EG8\nQ+pHDD+8SxEzTCLTv5acA3D45HaDHDJIGt1qULXVBD+30IZhZ+DszBHDGRN+SVoc\n4yuDDUYOvdC8SdZHf43cmkLVLLWULkEmylAJYyP9lVrjGIQS5owYgzc2HewJ6d+U\nCKwE5ip6h7gdQlfRcpFpeEo6S1agBVlMwgRNPok0Q+Ayz80q5WBe0HXpRHxcc3M2\nVGhvtfUGxcFTmQNogBaU1/4uHJP9ktlVs7HUk24OY0vkLKRJ6DStQ5z4VsCL8ahk\nl5MyMToeZfLlqRfkiny6xgYCvKreIhs921ok7q9kUQKBgQC2RkqSHv8xw+gTerH8\nqdso3dZaxDQcL1Y7kWfneNIfykPFWsYAK3DeD/ldNDPC9ZY992Y2hLf5BFQMup6R\namY7LFwkGGpJFxRRNxrq1B9q3l112DLMAlyYOxbJAPlkOyVkACG0TxXde9o7qsLa\nNZj9q8vK+gOl2p/Do7XNpwpk/wKBgQC1feXdEmdLttZccwrjmgpyM5fOxoQHf5Wa\nqZUfC1L9YfTP4od5Wu0cVHAqsK3wNHFkkObv330COqvS1y8IL0uBIvvclLqR83l2\nH+T81AsKEGC7gyV2ltm8LoLNzvf77RdISMaExvjF9X8AybAa0P3UVctqEDMjcADU\nwngdwRKIeQKBgQCG19tk2/+IbliqyHMR6wqR4gMo5Mt0KmTN7pUCfbRdBkI6pxuh\nloGKFiExHWRJj2tVbke0f1ymoNgZDpouE5uLnRaRMWq3pZZHOs/z93dClTxo6Mcz\ne2/KwrPpgYn952+S2jIU9QjE8FITIBHEYjBLQaOjBnBaazEUB3GAsVmUOwKBgQCa\n9j0OzkjeT+WlmCCjBwKGUeD7j2pp0JjXLpaBpDSe3kWePkf36RftCXegK6zIHK74\n8/QKueLNxXSyGEMzFNa+EzXDOEY4mg+KOV9WNGKcnDFLyYVyRQjx8TCEM4RvWRd5\nA5JlClKdC6j97jdsHiesZfjBvcU8K8S55LWUiiad2QKBgEfA1znOLPTcUJr025K3\nwowsKT8c+Rr3N+gzDTQZALK9kb4c/rB81wPqbV/fdpwr/anFjSOoaJwXL7XavmRm\npczRNhfM5nrLy26JUm2hn7DeJL3VzF0mxAV4eVsuPyJTcMnee+R2TVzljDHtDu3M\nSJ21G1741LW1WtbOJridF577\n-----END PRIVATE KEY-----\n",
+  "client_email": "salonautomation@salonautomation.iam.gserviceaccount.com",
+  "client_id": "112925376321955468525",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/salonautomation%40salonautomation.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

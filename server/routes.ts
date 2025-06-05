@@ -1,10 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProspectSchema } from "@shared/schema";
-import multer from "multer";
-import { z } from "zod";
-import { fromZodError } from "zod-validation-error";
+import { fetchProspectsFromSheet } from './googleSheets';
 
 // Baileys imports
 import * as baileys from '@whiskeysockets/baileys';
@@ -12,20 +9,7 @@ const { makeWASocket, DisconnectReason, useMultiFileAuthState } = baileys;
 import { Boom } from '@hapi/boom';
 import qrcode from 'qrcode-terminal';
 
-// Configure multer for CSV uploads
-const upload = multer({
-  storage: multer.memoryStorage(),
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only CSV files are allowed'));
-    }
-  },
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-});
+// Removed CSV upload functionality - using Google Sheets directly
 
 // WhatsApp connection state
 let sock: any = null;
@@ -76,32 +60,7 @@ async function initializeWhatsApp() {
   }
 }
 
-// Parse CSV content
-function parseCSV(csvContent: string) {
-  const lines = csvContent.trim().split('\n');
-  if (lines.length < 2) {
-    throw new Error('CSV must have at least a header row and one data row');
-  }
-
-  const header = lines[0].toLowerCase();
-  if (!header.includes('name') || !header.includes('skin problems') || !header.includes('phone')) {
-    throw new Error('CSV must have columns: Name, Skin Problems, Phone number');
-  }
-
-  const prospects = [];
-  for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-    if (values.length >= 3 && values[0] && values[1] && values[2]) {
-      prospects.push({
-        name: values[0],
-        skinProblems: values[1],
-        phoneNumber: values[2].replace(/\D/g, ''), // Remove non-digits for phone
-      });
-    }
-  }
-
-  return prospects;
-}
+// Removed CSV parsing - using Google Sheets directly
 
 // Send WhatsApp message
 async function sendWhatsAppMessage(phoneNumber: string, message: string) {
@@ -128,55 +87,170 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize WhatsApp on startup
   initializeWhatsApp();
 
-  // CSV Upload endpoint
-  app.post('/api/upload-csv', upload.single('csv'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: 'No CSV file uploaded' });
-      }
+  // Google Sheets Import endpoint - Main data source
+  // --- Automatically import prospects from Google Sheets on server start ---
+(async () => {
+  try {
+    console.log('🔄 Automatically importing prospects from Google Sheets on startup...');
+    const sheetProspects = await fetchProspectsFromSheet();
 
-      const csvContent = req.file.buffer.toString('utf-8');
-      const parsedProspects = parseCSV(csvContent);
+    const cleanProspects = sheetProspects
+      .filter(p => p && p.name && p.phoneNumber && p.skinProblem)
+      .map(p => ({
+        name: p.name.trim(),
+        phoneNumber: p.phoneNumber.trim(),
+        skinProblems: p.skinProblem.trim(),
+        // Don't assign status here because this is the sheet raw data
+        uniqueId: p.uniqueId || null,
+      }));
 
-      if (parsedProspects.length === 0) {
-        return res.status(400).json({ message: 'No valid prospects found in CSV' });
-      }
-
-      // Validate each prospect
-      const validatedProspects = [];
-      for (const prospect of parsedProspects) {
-        try {
-          const validated = insertProspectSchema.parse(prospect);
-          validatedProspects.push(validated);
-        } catch (error) {
-          console.warn('Invalid prospect data:', prospect, error);
-        }
-      }
-
-      if (validatedProspects.length === 0) {
-        return res.status(400).json({ message: 'No valid prospects after validation' });
-      }
-
-      // Store prospects
-      const createdProspects = await storage.createManyProspects(validatedProspects);
-
-      res.json({
-        message: `Successfully uploaded ${createdProspects.length} prospects`,
-        count: createdProspects.length,
-        prospects: createdProspects
-      });
-    } catch (error) {
-      console.error('CSV upload error:', error);
-      res.status(400).json({ 
-        message: error instanceof Error ? error.message : 'Failed to process CSV file' 
-      });
+    if (cleanProspects.length === 0) {
+      console.log('⚠️ No valid prospects found in Google Sheets on startup.');
+      return;
     }
-  });
+
+    const existingProspects = await storage.getAllProspects();
+    const existingMap = new Map(existingProspects.map(p => [p.uniqueId, p]));
+
+    const processedUniqueIds = new Set<string>();
+    const results: Array<Promise<Prospect>> = [];
+
+    for (const prospectData of cleanProspects) {
+      if (prospectData.uniqueId && existingMap.has(prospectData.uniqueId)) {
+        const existing = existingMap.get(prospectData.uniqueId)!;
+
+        // Check if any core data has changed, but ignore status here
+        const hasChanged =
+          existing.name !== prospectData.name ||
+          existing.phoneNumber !== prospectData.phoneNumber ||
+          existing.skinProblems !== prospectData.skinProblems;
+
+        if (hasChanged) {
+          const updated: Prospect = {
+            ...existing,
+            name: prospectData.name,
+            phoneNumber: prospectData.phoneNumber,
+            skinProblems: prospectData.skinProblems,
+            generatedMessage: `Hi ${prospectData.name}, we are here to help you with ${prospectData.skinProblems}.`
+          };
+          results.push(storage.updateProspect(updated));
+        } else {
+          // No changes, keep as is without update
+          results.push(Promise.resolve(existing));
+        }
+        processedUniqueIds.add(prospectData.uniqueId);
+      } else {
+        // New prospect, create with status "pending"
+        results.push(storage.createProspect({
+          ...prospectData,
+          uniqueId: undefined,
+          status: "pending"
+        }));
+      }
+    }
+
+    const createdOrUpdated = await Promise.all(results);
+
+    // Delete prospects no longer in the sheet
+    for (const existing of existingProspects) {
+      if (!processedUniqueIds.has(existing.uniqueId)) {
+        await storage.deleteProspect(existing.id);
+      }
+    }
+
+    console.log(`✅ Synced ${createdOrUpdated.length} prospects automatically from Google Sheets.`);
+  } catch (error) {
+    console.error('❌ Automatic import from Google Sheets failed:', error);
+  }
+})();
+
+
+
+// API endpoint
+
+app.post('/api/import-sheets', async (req, res) => {
+  try {
+    console.log('🔄 Manual import: Fetching from Google Sheets...');
+    const sheetProspects = await fetchProspectsFromSheet();
+
+    const cleanProspects = sheetProspects
+      .filter(p => p && p.name && p.phoneNumber && p.skinProblem)
+      .map(p => ({
+        name: p.name.trim(),
+        phoneNumber: p.phoneNumber.trim(),
+        skinProblems: p.skinProblem.trim(),
+        uniqueId: p.uniqueId || null,
+      }));
+
+    if (cleanProspects.length === 0) {
+      return res.status(200).json({ message: 'No valid prospects found in the sheet.' });
+    }
+
+    const existingProspects = await storage.getAllProspects();
+    const existingMap = new Map(existingProspects.map(p => [p.uniqueId, p]));
+
+    const processedUniqueIds = new Set<string>();
+    const results: Array<Promise<Prospect>> = [];
+
+    for (const prospectData of cleanProspects) {
+      if (prospectData.uniqueId && existingMap.has(prospectData.uniqueId)) {
+        const existing = existingMap.get(prospectData.uniqueId)!;
+
+        const hasChanged =
+          existing.name !== prospectData.name ||
+          existing.phoneNumber !== prospectData.phoneNumber ||
+          existing.skinProblems !== prospectData.skinProblems;
+
+        if (hasChanged) {
+          const updated: Prospect = {
+            ...existing,
+            name: prospectData.name,
+            phoneNumber: prospectData.phoneNumber,
+            skinProblems: prospectData.skinProblems,
+            status: existing.status,
+            generatedMessage: `Hi ${prospectData.name}, we are here to help you with ${prospectData.skinProblems}.`
+          };
+          results.push(storage.updateProspect(updated));
+        } else {
+          results.push(Promise.resolve(existing));
+        }
+        processedUniqueIds.add(prospectData.uniqueId);
+      } else {
+        results.push(storage.createProspect({
+          ...prospectData,
+          uniqueId: undefined,
+          status: "pending"
+        }));
+      }
+    }
+
+    const createdOrUpdated = await Promise.all(results);
+
+    // Delete prospects no longer in the sheet
+    for (const existing of existingProspects) {
+      if (!processedUniqueIds.has(existing.uniqueId)) {
+        await storage.deleteProspect(existing.id);
+      }
+    }
+
+    console.log(`✅ Synced ${createdOrUpdated.length} prospects manually from Google Sheets.`);
+    return res.json({
+      message: `Synced ${createdOrUpdated.length} prospects from Google Sheets.`,
+      count: createdOrUpdated.length
+    });
+
+  } catch (err) {
+    console.error('❌ Manual import failed:', err);
+    return res.status(500).json({ message: 'Import failed' });
+  }
+});
+
 
   // Get all prospects
   app.get('/api/prospects', async (req, res) => {
     try {
       const prospects = await storage.getAllProspects();
+      console.log(`📋 Fetched ${prospects.length} prospects from database`);
       res.json(prospects);
     } catch (error) {
       console.error('Error fetching prospects:', error);
@@ -236,6 +310,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/send-single', async (req, res) => {
+    try {
+      const { phoneNumber, message } = req.body;
+
+      const prospect = await storage.getProspectByPhoneNumber(phoneNumber);
+      if (!prospect) {
+        return res.status(404).json({ message: 'Prospect not found' });
+      }
+
+      // Use the message sent from frontend if available, else fallback
+      const textToSend = message && message.trim() !== '' ? message : prospect.generatedMessage;
+
+      const success = await sendWhatsAppMessage(prospect.phoneNumber, textToSend);
+
+      if (success) {
+        await storage.updateProspectStatus(prospect.id, 'sent');
+        return res.json({ message: `Message sent to ${prospect.name}` });
+      } else {
+        await storage.updateProspectStatus(prospect.id, 'failed');
+        return res.status(500).json({ message: 'Failed to send message' });
+      }
+    } catch (error) {
+      console.error('Single send error:', error);
+      return res.status(500).json({ message: 'Server error while sending message' });
+    }
+  });
+
+
   // WhatsApp status endpoint
   app.get('/api/whatsapp-status', (req, res) => {
     const isConnected = sock && sock.user;
@@ -245,6 +347,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       qrRequired: !isConnected && !qrCodeDisplayed,
       qrCode: currentQrCode
     });
+  });
+
+  // Test Google Sheets connection endpoint
+  app.get('/api/test-sheets', async (req, res) => {
+    try {
+      const { testGoogleSheetsConnection } = await import('./googleSheets');
+      const isConnected = await testGoogleSheetsConnection();
+      
+      if (isConnected) {
+        res.json({ message: 'Google Sheets connection successful!' });
+      } else {
+        res.status(500).json({ message: 'Google Sheets connection failed' });
+      }
+    } catch (error) {
+      console.error('Test connection error:', error);
+      res.status(500).json({ 
+        message: 'Error testing connection', 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   });
 
   // Update prospect status
@@ -285,6 +407,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Error deleting prospect:', error);
       res.status(500).json({ message: 'Failed to delete prospect' });
     }
+  });
+
+  // console logging removed (but keeping the middleware for non-status endpoints)
+  app.use((req, res, next) => {
+    if (req.path !== "/api/whatsapp-status") {
+      console.log(`${req.method} ${req.path}`);
+    }
+    next();
   });
 
   const httpServer = createServer(app);

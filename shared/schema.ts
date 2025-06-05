@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -10,6 +10,7 @@ export const users = pgTable("users", {
 
 export const prospects = pgTable("prospects", {
   id: serial("id").primaryKey(),
+  uniqueId: text("unique_id").notNull().unique(), // ✅ NEW: unique ID per row
   name: text("name").notNull(),
   skinProblems: text("skin_problems").notNull(),
   phoneNumber: text("phone_number").notNull(),
@@ -26,7 +27,7 @@ export const insertProspectSchema = createInsertSchema(prospects).omit({
   id: true,
   generatedMessage: true,
   status: true,
-});
+}); // ✅ uniqueId is kept
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;

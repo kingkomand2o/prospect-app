@@ -18,6 +18,19 @@ export default function ProspectsTable({ prospects, isLoading, onStatusUpdate }:
   const [searchTerm, setSearchTerm] = useState("");
   const [isSendingBulk, setIsSendingBulk] = useState(false);
   const { toast } = useToast();
+  const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
+const [isSendingOne, setIsSendingOne] = useState(false);
+const [customMessage, setCustomMessage] = useState("");
+const openModal = (prospect: Prospect) => {
+  setSelectedProspect(prospect);
+  setCustomMessage(prospect.generatedMessage || "");
+};
+
+const closeModal = () => {
+  setSelectedProspect(null);
+  setCustomMessage("");
+};
+
 
   const filteredProspects = prospects.filter(prospect =>
     prospect.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -59,6 +72,37 @@ export default function ProspectsTable({ prospects, isLoading, onStatusUpdate }:
       setIsSendingBulk(false);
     }
   };
+  const handleSendOne = async () => {
+  if (!selectedProspect) return;
+
+  setIsSendingOne(true);
+
+  try {
+    const response = await apiRequest("POST", "/api/send-single", {
+      phoneNumber: selectedProspect.phoneNumber,
+      message: customMessage,
+    });
+
+    const result = await response.json();
+
+    toast({
+      title: "Message Sent",
+      description: `Message sent to ${selectedProspect.name}.`,
+    });
+
+    closeModal();
+    onStatusUpdate();
+  } catch (error) {
+    toast({
+      title: "Failed to send message",
+      description: error instanceof Error ? error.message : "Something went wrong",
+      variant: "destructive",
+    });
+  } finally {
+    setIsSendingOne(false);
+  }
+};
+
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -101,6 +145,7 @@ export default function ProspectsTable({ prospects, isLoading, onStatusUpdate }:
   }
 
   return (
+    <>
     <Card>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
@@ -188,10 +233,11 @@ export default function ProspectsTable({ prospects, isLoading, onStatusUpdate }:
                           size="sm"
                           variant="ghost"
                           className="text-primary-600 hover:text-primary-700 p-1"
-                          disabled={prospect.status === 'sent'}
+                          onClick={() => openModal(prospect)}
                         >
                           <MessageCircle className="w-4 h-4" />
                         </Button>
+
                         <Button
                           size="sm"
                           variant="ghost"
@@ -228,5 +274,25 @@ export default function ProspectsTable({ prospects, isLoading, onStatusUpdate }:
         )}
       </CardContent>
     </Card>
+
+    {selectedProspect && (
+  <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+    <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
+      <h3 className="text-lg font-semibold mb-4">Send Message to {selectedProspect.name}</h3>
+      <textarea
+        className="w-full border rounded p-2 text-sm h-32"
+        value={customMessage}
+        onChange={(e) => setCustomMessage(e.target.value)}
+      />
+      <div className="mt-4 flex justify-end space-x-2">
+        <Button variant="outline" onClick={closeModal}>Cancel</Button>
+        <Button onClick={handleSendOne} disabled={isSendingOne}>
+          {isSendingOne ? "Sending..." : "Send Message"}
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
+    </>
   );
 }
